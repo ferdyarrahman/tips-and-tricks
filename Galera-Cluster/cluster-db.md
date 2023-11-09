@@ -18,10 +18,10 @@ server yang digunakan:
 
 |NAME SERVER|IP|HOSTNAME|DESCRIPTIONS|
 |--|--|--|--|
-|TDACI-HAPX-01|172.43.1.196|DB-HAPROXY|HaProxy Galera Cluster|
-|TDACI-DB-DEV-01|172.43.1.191|DB-CLUSTER-1|Cluster NODE 1 (main)|
-|TDACI-DB-ADEV-01|172.43.1.192|DB-CLUSTER-2|Cluster NODE 2|
-|TDACI-DB-PDEV-01|172.43.1.193|DB-CLUSTER-3|Cluster NODE 3|
+|TDACI-HAPX-01|xxx.xx.x.196|DB-HAPROXY|HaProxy Galera Cluster|
+|TDACI-DB-DEV-01|xxx.xx.x.191|DB-CLUSTER-1|Cluster NODE 1 (main)|
+|TDACI-DB-ADEV-01|xxx.xx.x.192|DB-CLUSTER-2|Cluster NODE 2|
+|TDACI-DB-PDEV-01|xxx.xx.x.193|DB-CLUSTER-3|Cluster NODE 3|
 
 ## Update System
 
@@ -49,10 +49,10 @@ hostnamectl set-hostname --static DB-CLUSTER-3
 di semua jalankan perintah ini untuk menambah mapping IP tersebut ke hostname
 
 ```bash
-echo '172.43.1.196  DB-HAPROXY
-172.43.1.191  DB-CLUSTER-1
-172.43.1.192  DB-CLUSTER-2
-172.43.1.193  DB-CLUSTER-3' >> /etc/hosts
+echo 'xxx.xx.x.196  DB-HAPROXY
+xxx.xx.x.191  DB-CLUSTER-1
+xxx.xx.x.192  DB-CLUSTER-2
+xxx.xx.x.193  DB-CLUSTER-3' >> /etc/hosts
 ```
 
 matikan services apparmor
@@ -93,7 +93,7 @@ Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera
 binlog_format=ROW
 default-storage-engine=innodb
 innodb_autoinc_lock_mode=2
-bind-address=172.43.1.191
+bind-address=xxx.xx.x.191
 
 # Galera Provider Configuration
 
@@ -101,11 +101,11 @@ wsrep_on=ON
 wsrep_provider=/usr/lib/galera/libgalera_smm.so
 
 wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://172.43.1.191,172.43.1.192,172.43.1.193"
+wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
 
 wsrep_sst_method=rsync
 
-wsrep_node_address="172.43.1.191"
+wsrep_node_address="xxx.xx.x.191"
 wsrep_node_name="DB-CLUSTER-1"
 ```
 
@@ -136,10 +136,10 @@ karena kita baru menjalankan 1 server cluster, jadi hanya muncul 1 di ukuran clu
 Buat user `haproxy`, user ini nanti dibuat untuk mengecek status database.
 
 ```sql
-CREATE USER 'haproxy'@'172.43.1.196';
+CREATE USER 'haproxy'@'xxx.xx.x.196';
 ```
 
-ganti `172.43.1.196` dengan IP HaProxy.
+ganti `xxx.xx.x.196` dengan IP HaProxy.
 
 ## Server Database 2 : DB-CLUSTER-2
 
@@ -150,7 +150,7 @@ Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera
 binlog_format=ROW
 default-storage-engine=innodb
 innodb_autoinc_lock_mode=2
-bind-address=172.43.1.192
+bind-address=xxx.xx.x.192
 
 # Galera Provider Configuration
 
@@ -158,11 +158,11 @@ wsrep_on=ON
 wsrep_provider=/usr/lib/galera/libgalera_smm.so
 
 wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://172.43.1.191,172.43.1.192,172.43.1.193"
+wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
 
 wsrep_sst_method=rsync
 
-wsrep_node_address="172.43.1.192"
+wsrep_node_address="xxx.xx.x.192"
 wsrep_node_name="DB-CLUSTER-2"
 ```
 
@@ -205,7 +205,7 @@ Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera
 binlog_format=ROW
 default-storage-engine=innodb
 innodb_autoinc_lock_mode=2
-bind-address=172.43.1.193
+bind-address=xxx.xx.x.193
 
 # Galera Provider Configuration
 
@@ -213,11 +213,11 @@ wsrep_on=ON
 wsrep_provider=/usr/lib/galera/libgalera_smm.so
 
 wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://172.43.1.191,172.43.1.192,172.43.1.193"
+wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
 
 wsrep_sst_method=rsync
 
-wsrep_node_address="172.43.1.193"
+wsrep_node_address="xxx.xx.x.193"
 wsrep_node_name="DB-CLUSTER-3"
 ```
 
@@ -313,7 +313,7 @@ listen stats
     stats auth jaranguda:WRmfp7Csprzq4NMLJbJsrhxLjPcmtX
 
 listen galera_cluster
-    bind 172.43.1.196:3306
+    bind xxx.xx.x.196:3306
     balance source
     mode tcp
     option tcpka
@@ -325,7 +325,7 @@ listen galera_cluster
     server DB-CLUSTER-3 DB-CLUSTER-3:3306  check weight 1
 ```
 
-`172.43.1.196` ganti dengan IP HaProxy.
+`xxx.xx.x.196` ganti dengan IP HaProxy.
 
 aktifkan haproxy waktu booting
 
@@ -342,8 +342,8 @@ systemctl restart haproxy
 bila anda membuat user baru di cluster mariadb tambahkan IP HaProxy untuk hostnamenya, contoh
 
 ```sql
-CREATE DATABASE clife_epay
-GRANT ALL PRIVILEGES ON userwp.* TO "clife_epay"@"172.43.1.196" IDENTIFIED BY "pxwLzqdLrFKTphzpH7";
+CREATE DATABASE usr_pesanan
+GRANT ALL PRIVILEGES ON userwp.* TO "usr_pesanan"@"xxx.xx.x.196" IDENTIFIED BY "pxwLzqdpH7";
 ```
 
 jadi nanti aplikasi akan mengakses database lewat Haproxy.
