@@ -27,7 +27,7 @@ server yang digunakan sebagai contoh:
 
 Update system Anda ke update paling baru yang tersedia, jalankan di semua server
 
-```bash
+```sh
 apt update; apt upgrade -y
 ```
 
@@ -35,7 +35,7 @@ apt update; apt upgrade -y
 
 Agar masing-masing server mudah dikenali, setting hostname masing-masing server
 
-```bash
+```sh
 # server 1
 hostnamectl set-hostname --static DB-CLUSTER-1
 # server 2
@@ -46,7 +46,7 @@ hostnamectl set-hostname --static DB-CLUSTER-3
 
 di semua jalankan perintah ini untuk menambah mapping IP tersebut ke hostname
 
-```bash
+```sh
 echo '192.168.0.191  DB-CLUSTER-1
 192.168.0.192  DB-CLUSTER-2
 192.168.0.193  DB-CLUSTER-3' >> /etc/hosts
@@ -56,7 +56,7 @@ echo '192.168.0.191  DB-CLUSTER-1
 
 Di ketiga server tersebut jalankan perintah berikut ini untuk menginstall MySQL/MariaDB
 
-```bash
+```sh
 apt install mariadb-server -y
 ```
 
@@ -64,13 +64,13 @@ Secara default, pengguna root MariaDB tidak memiliki kata sandi, jadi Anda perlu
 
 Anda dapat mengaturnya dengan perintah berikut:
 
-```bash
+```sh
 mysql_secure_installation
 ```
 
 Jawab semua pertanyaan, seperti yang ditunjukkan di bawah ini:
 
-```bash
+```sh
 Enter current password for root (enter for none): # Berikan kata sandi pengguna root Anda 
 Switch to unix_socket authentication [Y/n] # n
 Change the root password? [Y/n] # Y
@@ -84,7 +84,7 @@ Reload privilege tables now? [Y/n] # Y
 
 di Ubuntu services MariaDB otomatis dijalankan, karena kita masih butuh untuk konfigurasinya, matikan service nya terlebih dahulu
 
-```bash
+```sh
 systemctl stop mariadb
 ```
 
@@ -98,13 +98,13 @@ Pada titik ini, Anda telah menginstal dan mengkonfigurasi server MariaDB di seti
 
 Pertama, login ke server pertama dan buat file konfigurasi Galera dengan perintah berikut:
 
-```bash
+```sh
 nano /etc/mysql/conf.d/galera.cnf
 ```
 
 Tambahkan baris berikut:
 
-```bash
+```sh
 [mysqld]
 binlog_format=ROW
 default-storage-engine=innodb
@@ -133,13 +133,13 @@ Simpan dan tutup file setelah Anda selesai. Selanjutnya, Anda dapat melanjutkan 
 
 Selanjutnya login ke server kedua dan buat file konfigurasi Galera dengan perintah berikut:
 
-```bash
+```sh
 nano /etc/mysql/conf.d/galera.cnf
 ```
 
 Tambahkan baris berikut:
 
-```bash
+```sh
 [mysqld]
 binlog_format=ROW
 default-storage-engine=innodb
@@ -168,13 +168,13 @@ Simpan dan tutup file setelah Anda selesai. Selanjutnya, Anda dapat melanjutkan 
 
 Selanjutnya login ke server ketiga dan buat file konfigurasi Galera dengan perintah berikut:
 
-```bash
+```sh
 nano /etc/mysql/conf.d/galera.cnf
 ```
 
 Tambahkan baris berikut:
 
-```bash
+```sh
 [mysqld]
 binlog_format=ROW
 default-storage-engine=innodb
@@ -205,7 +205,7 @@ Pada titik ini, kami telah mengkonfigurasi ketiga server untuk berkomunikasi sat
 
 Inisialisasi cluster di node pertama dengan perintah berikut:
 
-```bash
+```sh
 galera_new_cluster
 ```
 
@@ -213,15 +213,15 @@ Perintah di atas akan memulai cluster dan menambahkan server1 ke cluster.
 
 Anda dapat memeriksanya dengan perintah berikut:
 
-```sql
+```mysql
 mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
 Enter password:
 ```
 
 Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat keluaran berikut:
 
-```sql
-+--------------------+-------+
+```mysql
++--------------------+-------+  
 | Variable_name      | Value |
 +--------------------+-------+
 | wsrep_cluster_size | 1     |
@@ -230,20 +230,20 @@ Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat keluaran berikut
 
 Selanjutnya, buka server kedua dan mulai layanan MariaDB:
 
-```bash
+```sh
 systemctl start mariadb
 ```
 
 Selanjutnya, verifikasi ukuran cluster Anda dengan perintah berikut:
 
-```sql
+```mysql
 mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
 Enter password:
 ```
 
 Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat bahwa server kedua telah bergabung dengan cluster.
 
-```sql
+```mysql
 +--------------------+-------+
 | Variable_name      | Value |
 +--------------------+-------+
@@ -253,20 +253,20 @@ Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat bahwa server ked
 
 Selanjutnya, buka server ketiga dan mulai layanan MariaDB:
 
-```bash
+```sh
 systemctl start mariadb
 ```
 
 Selanjutnya, verifikasi ukuran cluster Anda dengan perintah berikut:
 
-```sql
+```mysql
 mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
 Enter password:
 ```
 
 Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat bahwa server ketiga telah bergabung dengan cluster.
 
-```sql
+```mysql
 +--------------------+-------+
 | Variable_name      | Value |
 +--------------------+-------+
@@ -282,38 +282,38 @@ Untuk melakukannya, buat database di server pertama dan periksa apakah database 
 
 Di server1, masuk ke shell MySQL dengan perintah berikut:
 
-```bash
+```sh
 mysql -u root -p
 ```
 
 Berikan kata sandi root Anda saat diminta, lalu buat database dengan perintah berikut:
 
-```sql
+```mysql
 create database testDB1;
 create database testDB2;
 ```
 
 Selanjutnya, keluar dari shell MySQL dengan perintah berikut:
 
-```sql
+```mysql
 exit;
 ```
 
 Di server2, masuk ke shell MySQL dengan perintah berikut:
 
-```bash
+```sh
 mysql -u root -p
 ```
 
 Berikan kata sandi root Anda saat diminta dan periksa apakah databasenya ada.
 
-```sql
+```mysql
 show databases;
 ```
 
 Anda harus mendapatkan hasil berikut:
 
-```sql
+```mysql
 +--------------------+
 | Database           |
 +--------------------+
@@ -327,19 +327,19 @@ Anda harus mendapatkan hasil berikut:
 
 Di server3, masuk ke shell MySQL dengan perintah berikut:
 
-```bash
+```sh
 mysql -u root -p
 ```
 
 Berikan kata sandi root Anda saat diminta dan periksa apakah databasenya ada.
 
-```sql
+```mysql
 show databases;
 ```
 
 Anda harus mendapatkan hasil berikut:
 
-```sql
+```mysql
 +--------------------+
 | Database           |
 +--------------------+
