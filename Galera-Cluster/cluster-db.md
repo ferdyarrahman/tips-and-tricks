@@ -1,31 +1,31 @@
 # INSTALL DAN KONFIGURSAI MARIADB GALERA CLUSTER
 
-Membangun cluster MariaDB/MySQL kita bisa menggunakan Galera, Galera sudah termasuk dalam paket instalasi MariaDB di Ubuntu 20.04 jadi tidak perlu menginstall paket tambahan. Beberapa fitur Galera cluster
+Cluster database untuk meningkatkan ketersediaan database dengan mendistribusikan beban ke server yang berbeda. Jika ada server yang gagal maka server lain akan segera tersedia untuk melayani.
+Membangun cluster MariaDB/MySQL kita bisa menggunakan **Galera Cluster**, **Galera Cluster** sudah termasuk dalam paket instalasi MariaDB di Ubuntu 20.04 jadi tidak perlu menginstall paket tambahan. Dengan **Galera Cluster** perubahan yang dilakukan pada satu node akan direplikasi ke semua node. berikut fitur-fitur yang ada di **Galera Cluster**:
 
-- True Multi-master, Active-Active Cluster Read and write to any node at any time.
-- Synchronous Replication No slave lag, no data is lost at node crash.
-- Tightly Coupled All nodes hold the same state. No diverged data between nodes allowed.
-- Multi-threaded Slave For better performance. For any workload.
+- True Multi-master, Cluster Aktif-Aktif Membaca dan menulis ke node mana pun kapan saja.
+- Synchronous Replication No slave lag, tidak ada data yang hilang saat node bermasalah.
+- Tightly Coupled All nodes hold the same state. Tidak ada data yang berbeda antar node yang diperbolehkan.
+- Multi-threaded Slave For better performance.
 - No Master-Slave Failover Operations or Use of VIP.
 - Hot Standby No downtime during failover (since there is no failover).
-- Automatic Node Provisioning No need to manually back up the database and copy it to the new node.
+- Penyediaan Node Otomatis Tidak perlu membuat cadangan database secara manual dan menyalinnya ke node baru.
 - Supports InnoDB.
 - Transparent to Applications Required no (or minimal changes) to the application.
 - No Read and Write Splitting Needed.
 - Easy to Use and Deploy
 
-server yang digunakan:
+server yang digunakan sebagai contoh:
 
-|NAME SERVER|IP|HOSTNAME|DESCRIPTIONS|
-|--|--|--|--|
-|TDACI-HAPX-01|xxx.xx.x.196|DB-HAPROXY|HaProxy Galera Cluster|
-|TDACI-DB-DEV-01|xxx.xx.x.191|DB-CLUSTER-1|Cluster NODE 1 (main)|
-|TDACI-DB-ADEV-01|xxx.xx.x.192|DB-CLUSTER-2|Cluster NODE 2|
-|TDACI-DB-PDEV-01|xxx.xx.x.193|DB-CLUSTER-3|Cluster NODE 3|
+|IP|HOSTNAME|DESCRIPTIONS|
+|--|--|--|
+|192.168.0.191|DB-CLUSTER-1|Cluster NODE 1 (main)|
+|192.168.0.192|DB-CLUSTER-2|Cluster NODE 2|
+|192.168.0.193|DB-CLUSTER-3|Cluster NODE 3|
 
 ## Update System
 
-Update system anda ke update paling baru yang tersedia, jalankan di semua server
+Update system Anda ke update paling baru yang tersedia, jalankan di semua server
 
 ```bash
 apt update; apt upgrade -y
@@ -36,8 +36,6 @@ apt update; apt upgrade -y
 Agar masing-masing server mudah dikenali, setting hostname masing-masing server
 
 ```bash
-# server HaProxy
-hostnamectl set-hostname --static DB-HAPROXY
 # server 1
 hostnamectl set-hostname --static DB-CLUSTER-1
 # server 2
@@ -49,31 +47,39 @@ hostnamectl set-hostname --static DB-CLUSTER-3
 di semua jalankan perintah ini untuk menambah mapping IP tersebut ke hostname
 
 ```bash
-echo 'xxx.xx.x.196  DB-HAPROXY
-xxx.xx.x.191  DB-CLUSTER-1
-xxx.xx.x.192  DB-CLUSTER-2
-xxx.xx.x.193  DB-CLUSTER-3' >> /etc/hosts
-```
-
-matikan services apparmor
-
-```bash
-systemctl stop apparmor
-systemctl disable apparmor
-```
-
-ubah file permission `/tmp` agar bisa ditulis oleh MariaDB.
-
-```bash
-chmod 777 /tmp
+echo '192.168.0.191  DB-CLUSTER-1
+192.168.0.192  DB-CLUSTER-2
+192.168.0.193  DB-CLUSTER-3' >> /etc/hosts
 ```
 
 ## Install MariaDB Server
 
-Di ketiga server tersebut jalankan perintah berikut ini untuk menginstall MySQL/MariaDB 10.3
+Di ketiga server tersebut jalankan perintah berikut ini untuk menginstall MySQL/MariaDB
 
 ```bash
 apt install mariadb-server -y
+```
+
+Secara default, pengguna root MariaDB tidak memiliki kata sandi, jadi Anda perlu menyetel kata sandi untuk pengguna root MariaDB.
+
+Anda dapat mengaturnya dengan perintah berikut:
+
+```bash
+mysql_secure_installation
+```
+
+Jawab semua pertanyaan, seperti yang ditunjukkan di bawah ini:
+
+```bash
+Enter current password for root (enter for none): # Berikan kata sandi pengguna root Anda 
+Switch to unix_socket authentication [Y/n] # n
+Change the root password? [Y/n] # Y
+New password:
+Re-enter new password:
+Remove anonymous users? [Y/n] # Y
+Disallow root login remotely? [Y/n] # Y
+Remove test database and access to it? [Y/n] # Y
+Reload privilege tables now? [Y/n] # Y
 ```
 
 di Ubuntu services MariaDB otomatis dijalankan, karena kita masih butuh untuk konfigurasinya, matikan service nya terlebih dahulu
@@ -82,48 +88,139 @@ di Ubuntu services MariaDB otomatis dijalankan, karena kita masih butuh untuk ko
 systemctl stop mariadb
 ```
 
-Untuk konfigurasi cluster berikut ini sesuaikan IP address dengan IP Server database yang anda miliki.
+Silakan ulangi langkah di atas pada 3 server database.
 
-## Server Database 1 : DB-CLUSTER-1
+## Konfigurasikan Setiap Server di Cluster
 
-Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera.cnf`, buat file tersebut lalu isi dengan
+Pada titik ini, Anda telah menginstal dan mengkonfigurasi server MariaDB di setiap server. Selanjutnya, Anda perlu mengkonfigurasi cluster Galera untuk berkomunikasi antar server. Untuk melakukannya, Anda perlu membuat file konfigurasi umum di setiap server.
+
+### Server Database 1 : DB-CLUSTER-1
+
+Pertama, login ke server pertama dan buat file konfigurasi Galera dengan perintah berikut:
+
+```bash
+nano /etc/mysql/conf.d/galera.cnf
+```
+
+Tambahkan baris berikut:
 
 ```bash
 [mysqld]
 binlog_format=ROW
 default-storage-engine=innodb
 innodb_autoinc_lock_mode=2
-bind-address=xxx.xx.x.191
+bind-address=0.0.0.0
 
 # Galera Provider Configuration
-
 wsrep_on=ON
 wsrep_provider=/usr/lib/galera/libgalera_smm.so
 
-wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
+# Galera Cluster Configuration
+wsrep_cluster_name="galera_cluster"
+wsrep_cluster_address="gcomm://192.168.0.191,192.168.0.192,192.168.0.193"
 
+# Galera Synchronization Configuration
 wsrep_sst_method=rsync
 
-wsrep_node_address="xxx.xx.x.191"
+# Galera Node Configuration
+wsrep_node_address="192.168.0.191"
 wsrep_node_name="DB-CLUSTER-1"
 ```
 
-untuk binding IP address kita setting di `50-galera.cnf`, jadi bind di `50-server.cnf` dinonaktifkan
+Simpan dan tutup file setelah Anda selesai. Selanjutnya, Anda dapat melanjutkan ke server kedua
+
+### Server Database 2 : DB-CLUSTER-2
+
+Selanjutnya login ke server kedua dan buat file konfigurasi Galera dengan perintah berikut:
 
 ```bash
-sed -i 's/bind-address/#bind-address/g'  /etc/mysql/mariadb.conf.d/50-server.cnf
+nano /etc/mysql/conf.d/galera.cnf
 ```
 
-Cluster database ini akan dijalankan dari **DB-CLUSTER-1** dengan perintah galera_new_cluster. Setelah menjalankan perintah tersebut cek status cluster anda.
+Tambahkan baris berikut:
 
 ```bash
-mysql  -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+[mysqld]
+binlog_format=ROW
+default-storage-engine=innodb
+innodb_autoinc_lock_mode=2
+bind-address=0.0.0.0
+
+# Galera Provider Configuration
+wsrep_on=ON
+wsrep_provider=/usr/lib/galera/libgalera_smm.so
+
+# Galera Cluster Configuration
+wsrep_cluster_name="galera_cluster"
+wsrep_cluster_address="gcomm://192.168.0.191,192.168.0.192,192.168.0.193"
+
+# Galera Synchronization Configuration
+wsrep_sst_method=rsync
+
+# Galera Node Configuration
+wsrep_node_address="192.168.0.192"
+wsrep_node_name="DB-CLUSTER-2"
 ```
 
-outputnya
+Simpan dan tutup file setelah Anda selesai. Selanjutnya, Anda dapat melanjutkan ke server ketiga.
+
+### Server Database 3 : DB-CLUSTER-3
+
+Selanjutnya login ke server ketiga dan buat file konfigurasi Galera dengan perintah berikut:
 
 ```bash
+nano /etc/mysql/conf.d/galera.cnf
+```
+
+Tambahkan baris berikut:
+
+```bash
+[mysqld]
+binlog_format=ROW
+default-storage-engine=innodb
+innodb_autoinc_lock_mode=2
+bind-address=0.0.0.0
+
+# Galera Provider Configuration
+wsrep_on=ON
+wsrep_provider=/usr/lib/galera/libgalera_smm.so
+
+# Galera Cluster Configuration
+wsrep_cluster_name="galera_cluster"
+wsrep_cluster_address="gcomm://192.168.0.191,192.168.0.192,192.168.0.193"
+
+# Galera Synchronization Configuration
+wsrep_sst_method=rsync
+
+# Galera Node Configuration
+wsrep_node_address="192.168.0.193"
+wsrep_node_name="DB-CLUSTER-3"
+```
+
+Simpan dan tutup file setelah Anda selesai.
+
+Pada titik ini, kami telah mengkonfigurasi ketiga server untuk berkomunikasi satu sama lain.
+
+## Inisialisasi Cluster Galera
+
+Inisialisasi cluster di node pertama dengan perintah berikut:
+
+```bash
+galera_new_cluster
+```
+
+Perintah di atas akan memulai cluster dan menambahkan server1 ke cluster.
+
+Anda dapat memeriksanya dengan perintah berikut:
+
+```sql
+mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+Enter password:
+```
+
+Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat keluaran berikut:
+
+```sql
 +--------------------+-------+
 | Variable_name      | Value |
 +--------------------+-------+
@@ -131,62 +228,22 @@ outputnya
 +--------------------+-------+
 ```
 
-karena kita baru menjalankan 1 server cluster, jadi hanya muncul 1 di ukuran clusternya.
-
-Buat user `haproxy`, user ini nanti dibuat untuk mengecek status database.
-
-```sql
-CREATE USER 'haproxy'@'xxx.xx.x.196';
-```
-
-ganti `xxx.xx.x.196` dengan IP HaProxy.
-
-## Server Database 2 : DB-CLUSTER-2
-
-Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera.cnf`, buat file tersebut lalu isi dengan
-
-```bash
-[mysqld]
-binlog_format=ROW
-default-storage-engine=innodb
-innodb_autoinc_lock_mode=2
-bind-address=xxx.xx.x.192
-
-# Galera Provider Configuration
-
-wsrep_on=ON
-wsrep_provider=/usr/lib/galera/libgalera_smm.so
-
-wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
-
-wsrep_sst_method=rsync
-
-wsrep_node_address="xxx.xx.x.192"
-wsrep_node_name="DB-CLUSTER-2"
-```
-
-untuk binding IP address kita setting di 50-galera.cnf, jadi bind di 50-server.cnf dinonaktifkan
-
-```bash
-sed -i 's/bind-address/#bind-address/g'  /etc/mysql/mariadb.conf.d/50-server.cnf
-```
-
-Jalankan services mariadb
+Selanjutnya, buka server kedua dan mulai layanan MariaDB:
 
 ```bash
 systemctl start mariadb
 ```
 
-Setelah menjalankan perintah tersebut cek status cluster anda.
+Selanjutnya, verifikasi ukuran cluster Anda dengan perintah berikut:
 
-```bash
-mysql  -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+```sql
+mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+Enter password:
 ```
 
-outputnya
+Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat bahwa server kedua telah bergabung dengan cluster.
 
-```bash
+```sql
 +--------------------+-------+
 | Variable_name      | Value |
 +--------------------+-------+
@@ -194,54 +251,22 @@ outputnya
 +--------------------+-------+
 ```
 
-sekarang sudah keliatan ukuran cluster menjadi 2.
-
-## Server Database 3 : DB-CLUSTER-3
-
-Konfigurasi Galera cluster akan disimpan di `/etc/mysql/mariadb.conf.d/50-galera.cnf`, buat file tersebut lalu isi dengan
-
-```bash
-[mysqld]
-binlog_format=ROW
-default-storage-engine=innodb
-innodb_autoinc_lock_mode=2
-bind-address=xxx.xx.x.193
-
-# Galera Provider Configuration
-
-wsrep_on=ON
-wsrep_provider=/usr/lib/galera/libgalera_smm.so
-
-wsrep_cluster_name="dbcluster"
-wsrep_cluster_address="gcomm://xxx.xx.x.191,xxx.xx.x.192,xxx.xx.x.193"
-
-wsrep_sst_method=rsync
-
-wsrep_node_address="xxx.xx.x.193"
-wsrep_node_name="DB-CLUSTER-3"
-```
-
-untuk binding IP address kita setting di `50-galera.cnf`, jadi bind di `50-server.cnf` dinonaktifkan
-
-```bash
-sed -i 's/bind-address/#bind-address/g'  /etc/mysql/mariadb.conf.d/50-server.cnf
-```
-
-Jalankan services mariadb
+Selanjutnya, buka server ketiga dan mulai layanan MariaDB:
 
 ```bash
 systemctl start mariadb
 ```
 
-Setelah menjalankan perintah tersebut cek status cluster anda.
+Selanjutnya, verifikasi ukuran cluster Anda dengan perintah berikut:
 
-```bash
-mysql  -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+```sql
+mysql -u root -p -e "SHOW STATUS LIKE 'wsrep_cluster_size'"
+Enter password:
 ```
 
-outputnya
+Berikan kata sandi root Anda dan tekan Enter. Anda akan melihat bahwa server ketiga telah bergabung dengan cluster.
 
-```bash
+```sql
 +--------------------+-------+
 | Variable_name      | Value |
 +--------------------+-------+
@@ -249,101 +274,81 @@ outputnya
 +--------------------+-------+
 ```
 
-ukuran cluster sudah menjadi 3, sesuai dengan jumlah server yang kita alokasikan.
+## Uji Replikasi Cluster Galera
 
-## Testing Query Cluster
+Cluster Galera Anda sekarang sudah aktif dan berjalan. Saatnya menguji dan melihat apakah replikasi berfungsi.
 
-Untuk mengecek apakah cluster kita sudah bisa saling sinkronisasi data, buat database baru untuk testing. Login ke mysql/mariadb di CLUSTER-DB-1
+Untuk melakukannya, buat database di server pertama dan periksa apakah database tersebut telah direplikasi ke server lain.
 
-```sql
-mysql
-```
-
-lalu eksekusi query dibawah ini
-
-```sql
-CREATE DATABASE dbpesan;
-CREATE TABLE dbpesan.pesan_singkat ( `id` INT NOT NULL AUTO_INCREMENT , `pesan` TEXT NOT NULL , PRIMARY KEY (`id`));
-INSERT INTO dbpesan.pesan_singkat (`id`, `pesan`) VALUES (1, 'pesan pertama');
-INSERT INTO dbpesan.pesan_singkat (`id`, `pesan`) VALUES (2, 'pesan kedua');
-INSERT INTO dbpesan.pesan_singkat (`id`, `pesan`) VALUES (3, 'pesan ketiga');
-```
-
-dari ketiga server cek user hasil querynya
-
-```sql
-SELECT * FROM dbpesan.pesan_singkat;
-```
-
-keluaran query diatas
-
-```sql
-+----+---------------+
-| id | pesan         |
-+----+---------------+
-|  1 | pesan pertama |
-|  2 | pesan kedua   |
-|  3 | pesan ketiga  |
-+----+---------------+
-3 rows in set (0.001 sec)
-```
-
-## HaProxy Galera Cluster
-
-Sampai disini kita belum bisa membagi rata akses ke cluster database yang telah kita buat, untuk itu kita akan menggunakan HaProxy sebagai load balancer
-
-Install HaProxy
+Di server1, masuk ke shell MySQL dengan perintah berikut:
 
 ```bash
-apt install haproxy -y
+mysql -u root -p
 ```
 
-Di konfigurasi HaProxy `/etc/haproxy/haproxy.cfg` tambahkan dibagian paling bawah
-
-```bash
-# statistik
-
-listen stats
-    bind :8080
-    mode http
-    stats enable
-    stats hide-version
-    stats realm Haproxy\ Statistics
-    stats uri /
-    stats auth jaranguda:WRmfp7Csprzq4NMLJbJsrhxLjPcmtX
-
-listen galera_cluster
-    bind xxx.xx.x.196:3306
-    balance source
-    mode tcp
-    option tcpka
-    option mysql-check user haproxy
-    option tcplog
-
-    server DB-CLUSTER-1 DB-CLUSTER-1:3306  check weight 1
-    server DB-CLUSTER-2 DB-CLUSTER-2:3306  check weight 1
-    server DB-CLUSTER-3 DB-CLUSTER-3:3306  check weight 1
-```
-
-`xxx.xx.x.196` ganti dengan IP HaProxy.
-
-aktifkan haproxy waktu booting
-
-```bash
-systemctl enable haproxy
-```
-
-jalankan service haproxy
-
-```bash
-systemctl restart haproxy
-```
-
-bila anda membuat user baru di cluster mariadb tambahkan IP HaProxy untuk hostnamenya, contoh
+Berikan kata sandi root Anda saat diminta, lalu buat database dengan perintah berikut:
 
 ```sql
-CREATE DATABASE usr_pesanan
-GRANT ALL PRIVILEGES ON userwp.* TO "usr_pesanan"@"xxx.xx.x.196" IDENTIFIED BY "pxwLzqdpH7";
+create database testDB1;
+create database testDB2;
 ```
 
-jadi nanti aplikasi akan mengakses database lewat Haproxy.
+Selanjutnya, keluar dari shell MySQL dengan perintah berikut:
+
+```sql
+exit;
+```
+
+Di server2, masuk ke shell MySQL dengan perintah berikut:
+
+```bash
+mysql -u root -p
+```
+
+Berikan kata sandi root Anda saat diminta dan periksa apakah databasenya ada.
+
+```sql
+show databases;
+```
+
+Anda harus mendapatkan hasil berikut:
+
+```sql
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| testDB1            |
+| testDB2            |
++--------------------+
+```
+
+Di server3, masuk ke shell MySQL dengan perintah berikut:
+
+```bash
+mysql -u root -p
+```
+
+Berikan kata sandi root Anda saat diminta dan periksa apakah databasenya ada.
+
+```sql
+show databases;
+```
+
+Anda harus mendapatkan hasil berikut:
+
+```sql
++--------------------+
+| Database           |
++--------------------+
+| information_schema |
+| mysql              |
+| performance_schema |
+| testDB1            |
+| testDB2            |
++--------------------+
+```
+
+Output di atas dengan jelas menunjukkan bahwa replikasi berfungsi dengan baik.
