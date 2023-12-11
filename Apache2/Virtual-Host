@@ -1,0 +1,105 @@
+# Cara Mengatur Host Virtual Apache di Ubuntu
+
+## Membuat File Vistrual Host Baru
+
+File host virtual adalah file yang menentukan konfigurasi sebenarnya dari host virtual Anda dan menentukan bagaimana server web Apache akan merespons berbagai permintaan domain.
+
+Apache hadir dengan file host virtual default bernama 000-default.conf. Anda dapat menyalin file ini untuk membuat file host virtual untuk setiap domain Anda.
+
+Salin file konfigurasi default ke domain pertama:
+
+```bash
+sudo cp /etc/apache2/sites-available/000-default.conf /etc/apache2/sites-available/your_new_domain.conf
+```
+
+Perlu diketahui bahwa konfigurasi default Ubuntu mengharuskan setiap file host virtual diakhiri dengan .conf.
+
+Buka file baru di editor teks pilihan Anda dengan hak akses root :
+
+```bash
+sudo nano /etc/apache2/sites-available/your_new_domain.conf
+```
+
+## Konfigurasi Virtual Host
+
+Tambahkan script sesuai dengan kebutuhan:
+
+```bash
+server {
+        listen 443 ssl http2;
+        listen [::]:443 http2;
+
+        # root /var/www/app/clauth/public;
+        root /var/www/cicd/clauth/public;
+        ssl on;
+        ssl_certificate your_ssl_certificate;
+        ssl_trusted_certificate your_ssl_certificate;
+        ssl_certificate_key your_key_ssl_certificate;
+
+        index index.php index.html index.htm index.nginx-debian.html;
+
+        # Add index.php to the list if you are using PHP
+
+
+         server_name your_new_domain;
+
+
+ location / {
+
+               try_files $uri $uri/ /index.php$is_args$args;
+       }
+
+        # pass PHP scripts to FastCGI server
+        #
+        location ~ \.php$ {
+                try_files $uri =404;
+                fastcgi_split_path_info ^(.+\.php)(/.+)$;
+                fastcgi_pass unix:/run/php/php7.4-fpm.sock;                     
+                fastcgi_index index.php;
+                fastcgi_param SCRIPT_FILENAME $document_root$fastcgi_script_name;
+                include fastcgi_params;
+    }
+
+
+}
+```
+
+Simpan dan keluar.
+
+## Symlink Virtual Host
+
+Buat symbolic link dari sites-available ke sites-enabled. Sebab sites-enabled yang ditambahkan ke dalam konfigurasi Apache.
+
+```bash
+ln -s /etc/httpd/sites-available/primary.dewiweb.net.conf /etc/httpd/sites-enabled/
+```
+
+Restart Apache untuk load perubahan konfigurasi yang sudah dilakukan sebelumnya.
+
+## Reload Apache2
+
+Selanjutnya, uji kesalahan konfigurasi:
+
+```bash
+sudo apache2ctl configtest
+```
+
+output
+
+```bash
+Output
+. . .
+Syntax OK
+```
+
+Setelah Anda selesai, mulai ulang Apache agar perubahan ini diterapkan.
+
+```bash
+sudo systemctl restart apache2
+```
+
+Secara opsional, Anda dapat memeriksa status server setelah semua perubahan ini dengan perintah ini:
+
+```bash
+sudo systemctl status apache2
+```
