@@ -228,3 +228,77 @@ Untuk memulai, masuk ke konsol MariaDB/MySQL:
 ```bash
 mysql -u root -p
 ```
+
+## Menginstal GIT
+
+Jalankan perintah berikut
+
+```bash
+sudo apt install git
+```
+
+Anda dapat mengonfirmasi bahwa Anda telah menginstal Git dengan benar dengan menjalankan perintah berikut dan memeriksa apakah Anda menerima keluaran yang relevan.
+
+```bash
+git --version
+```
+
+## Deploy Project Lument
+
+Untuk proses ini Anda dapat melakukan perpindahan projek secara manual ssh ke server atau menggunakan clone repository.
+letakan project Anda di lokasi berikut:
+
+```bash
+cd /var/www
+```
+
+## Menyiapkan Nginx
+
+Anda akan membuat file konfigurasi virtual host baru di /etc/nginx/sites-available:
+
+```bash
+sudo nano /etc/nginx/sites-available/{name-host}
+```
+
+File konfigurasi berikut berisi pengaturan yang direkomendasikan untuk aplikasi Lumen di Nginx:
+
+```bash
+server {
+    listen 443;
+    server_name server_domain_or_IP;
+    root /var/www/{projet_lumen}/public;
+
+    add_header X-Frame-Options "SAMEORIGIN";
+    add_header X-XSS-Protection "1; mode=block";
+    add_header X-Content-Type-Options "nosniff";
+
+    ssl on;
+    ssl_certificate dir_ssl;
+    ssl_trusted_certificate dir_ssl;
+    ssl_certificate_key dir_ssl;
+
+    index index.html index.htm index.php;
+
+    charset utf-8;
+
+    location / {
+        try_files $uri $uri/ /index.php?$query_string;
+    }
+
+    location = /favicon.ico { access_log off; log_not_found off; }
+    location = /robots.txt  { access_log off; log_not_found off; }
+
+    error_page 404 /index.php;
+
+    location ~ \.php$ {
+        fastcgi_pass unix:/var/run/php/php7.4-fpm.sock;
+        fastcgi_index index.php;
+        fastcgi_param SCRIPT_FILENAME $realpath_root$fastcgi_script_name;
+        include fastcgi_params;
+    }
+
+    location ~ /\.(?!well-known).* {
+        deny all;
+    }
+}
+```
